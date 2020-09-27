@@ -35,7 +35,7 @@ func HandleFile(contentType string, mids []string, ctrl func(*Context) *os.File)
 }
 
 func (h MediaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx, e := newContext(w, r, false)
+	ctx, e := newContext(w, r)
 	if clog.CheckError(e) {
 		ctx.Status = 500
 		ctx.Response = e.Error()
@@ -106,4 +106,5 @@ func (h MediaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx.w.WriteHeader(ctx.Status)
 	io.Copy(w, file)
 
+	close(ctx.doneChan)
 }

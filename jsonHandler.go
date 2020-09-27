@@ -23,7 +23,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	ctx, e := newContext(w, r, false)
+	ctx, e := newContext(w, r)
 	if checkErr(e) {
 		ctx.Status = 500
 		ctx.Response = e.Error()

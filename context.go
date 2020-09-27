@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const defaultTimeout = 300
+var defaultTimeout = 300
 
 var (
 	hostname   string
@@ -38,17 +38,16 @@ func SetCors(enabled bool) {
 	enableCors = enabled
 }
 
-func newContext(w http.ResponseWriter, r *http.Request, needAuth bool) (ctx *Context, e error) {
-	var body []byte
+func newContext(w http.ResponseWriter, r *http.Request) (ctx *Context, e error) {
+	var body = make([]byte, 0)
 	ctx = &Context{}
 
 	ctx.doneChan = make(chan struct{}, 1)
-	defer close(ctx.doneChan)
 	go func() {
 		select {
 		case <-ctx.doneChan:
 			return
-		case <-time.After(defaultTimeout * time.Second):
+		case <-time.After(time.Duration(defaultTimeout) * time.Second):
 			ctx.Status = 537
 			ctx.Response = "Imposible to answer. Server is hanged up or too busy"
 			ctx.serveError()
@@ -57,13 +56,16 @@ func newContext(w http.ResponseWriter, r *http.Request, needAuth bool) (ctx *Con
 	ctx.Request = r
 
 	ctx.w = w
-	body, _ = ioutil.ReadAll(r.Body)
-	ctx.Body = body
-
-	e = r.Body.Close()
-	if checkErr(r.Body.Close()) {
-		return
+	if r.Body != nil {
+		body, e = ioutil.ReadAll(r.Body)
+		if checkErr(e) {
+			return
+		}
+		if e = r.Body.Close(); checkErr(e) {
+			return
+		}
 	}
+	ctx.Body = body
 
 	r.ParseForm()
 	ctx.multiParam = multiParam{ctx: ctx}
@@ -95,6 +97,7 @@ func (ctx *Context) serveJSON() {
 
 	ctx.w.WriteHeader(ctx.Status)
 	io.WriteString(ctx.w, myJS)
+	close(ctx.doneChan)
 }
 
 func (ctx *Context) serveError() {
@@ -102,6 +105,7 @@ func (ctx *Context) serveError() {
 	ctx.w.WriteHeader(ctx.Status)
 	jout, _ := json.Marshal(map[string]interface{}{"error": ctx.Response})
 	io.WriteString(ctx.w, string(jout))
+	close(ctx.doneChan)
 }
 
 func writeCrossDomainHeaders(w http.ResponseWriter, req *http.Request) {
